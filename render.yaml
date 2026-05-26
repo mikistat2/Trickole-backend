@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: cinemarace-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    autoDeploy: true
+    envVars: []
