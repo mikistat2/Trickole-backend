@@ -22,6 +22,8 @@ const allowedOrigins = [
   'https://trikole.vercel.app',
   /https:\/\/.*\.vercel\.app$/,
   /capacitor:\/\/.*/,
+  'http://localhost',
+  'https://localhost',
 ].filter(Boolean);
 
 // ─── Security ──────────────────────────────────────────────
