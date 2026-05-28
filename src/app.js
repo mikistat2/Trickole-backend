@@ -16,11 +16,19 @@ const settingsRoutes = require('./routes/settings.routes');
 
 const app = express();
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://cinemarace.app',
+  'https://trikole.vercel.app',
+  /https:\/\/.*\.vercel\.app$/,
+  /capacitor:\/\/.*/,
+].filter(Boolean);
+
 // ─── Security ──────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://cinemarace.app', /capacitor:\/\/.*/]
+    ? allowedOrigins
     : ['http://localhost:5173', 'http://localhost:3000', /capacitor:\/\/.*/],
   credentials: true,
 }));
