@@ -32,6 +32,17 @@ async function getRoomLeaderboard(req, res) {
     );
     if (!member.rows.length) return res.status(403).json({ error: 'Not a member of this room' });
 
+    // Get room time window
+    const roomResult = await pool.query(
+      'SELECT starts_at, ends_at FROM rooms WHERE id=$1',
+      [roomId]
+    );
+    if (!roomResult.rows.length) return res.status(404).json({ error: 'Room not found' });
+
+    const { starts_at, ends_at } = roomResult.rows[0];
+
+    // Count ALL verified watches by room members within the room's time window,
+    // not just watches explicitly tagged with this room_id
     const result = await pool.query(
       `SELECT
          u.id, u.username, u.avatar_url,
@@ -42,11 +53,14 @@ async function getRoomLeaderboard(req, res) {
          json_agg(DISTINCT DATE(vw.verified_at)) FILTER (WHERE vw.id IS NOT NULL) AS watch_dates
        FROM room_members rm
        JOIN users u ON u.id = rm.user_id
-       LEFT JOIN verified_watches vw ON vw.user_id = rm.user_id AND vw.room_id = $1
+       LEFT JOIN verified_watches vw
+         ON vw.user_id = rm.user_id
+         AND vw.verified_at >= $2
+         AND vw.verified_at <= $3
        WHERE rm.room_id = $1
        GROUP BY u.id, u.username, u.avatar_url
        ORDER BY total_watched DESC, total_minutes DESC`,
-      [roomId]
+      [roomId, starts_at, ends_at]
     );
     res.json(result.rows);
   } catch (err) {

@@ -162,18 +162,25 @@ Start your response with [ and end with ]. No other text.`
       throw new Error(`Failed to parse AI response: ${e.message}`);
     }
 
-    const results = [];
-    for (const item of movieRequests) {
-      const data = await tmdb.get('/search/movie', { query: item.title, primary_release_year: item.year });
-      if (data.results && data.results.length > 0) {
-        results.push(data.results[0]);
-      } else {
-        const fallback = await tmdb.get('/search/movie', { query: item.title });
-        if (fallback.results && fallback.results.length > 0) {
-          results.push(fallback.results[0]);
+    const promises = movieRequests.map(async (item) => {
+      try {
+        const data = await tmdb.get('/search/movie', { query: item.title, primary_release_year: item.year });
+        if (data.results && data.results.length > 0) {
+          return data.results[0];
+        } else {
+          const fallback = await tmdb.get('/search/movie', { query: item.title });
+          if (fallback.results && fallback.results.length > 0) {
+            return fallback.results[0];
+          }
         }
+      } catch (err) {
+        console.error(`Error searching TMDB for "${item.title}":`, err.message);
       }
-    }
+      return null;
+    });
+
+    const searchResults = await Promise.all(promises);
+    const results = searchResults.filter(Boolean);
 
     res.json(results);
   } catch (err) {
