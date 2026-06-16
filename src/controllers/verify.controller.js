@@ -131,10 +131,22 @@ async function generateQuestionsWithGemini(movie) {
 
 // Generate quiz questions for a movie
 async function generateQuiz(req, res) {
-  const { tmdb_id, title, year } = req.body;
+  const { tmdb_id, title, year, season_number } = req.body;
   if (!tmdb_id || !title) return res.status(400).json({ error: 'tmdb_id and title required' });
 
   try {
+    // Prevent re-verification: check if user already passed this movie/season
+    const sn = season_number != null ? season_number : null;
+    const alreadyVerified = await pool.query(
+      `SELECT id FROM verified_watches
+       WHERE user_id=$1 AND tmdb_id=$2 AND COALESCE(season_number, -1) = COALESCE($3, -1)
+       LIMIT 1`,
+      [req.user.id, tmdb_id, sn]
+    );
+    if (alreadyVerified.rows.length > 0) {
+      return res.status(409).json({ error: 'already_verified' });
+    }
+
     let questions = [];
     let source = 'gemini';
     const movie = await tmdb.get(`/movie/${tmdb_id}`, { append_to_response: 'credits' });
@@ -151,7 +163,7 @@ async function generateQuiz(req, res) {
       return res.status(500).json({ error: 'Unable to generate quiz questions at this time.' });
     }
 
-    // Store quiz session temporarily (5 min TTL via expires_at)
+    // Store quiz session
     const result = await pool.query(
       `INSERT INTO quiz_attempts (user_id, tmdb_id, questions, answers, score, passed)
        VALUES ($1, $2, $3, '[]', 0, false)

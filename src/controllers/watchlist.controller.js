@@ -2,8 +2,6 @@ const { pool } = require('../config/database');
 
 async function getWatchlist(req, res) {
   try {
-    const { date } = req.query;
-    const targetDate = date || new Date().toISOString().slice(0, 10);
     const result = await pool.query(
       `SELECT w.*, vw.verified_at
        FROM watchlist w
@@ -11,9 +9,9 @@ async function getWatchlist(req, res) {
          ON vw.tmdb_id = w.tmdb_id
          AND vw.user_id = w.user_id
          AND COALESCE(vw.season_number, -1) = COALESCE(w.season_number, -1)
-       WHERE w.user_id = $1 AND w.queued_for = $2
+       WHERE w.user_id = $1
        ORDER BY w.added_at ASC`,
-      [req.user.id, targetDate]
+      [req.user.id]
     );
     res.json(result.rows);
   } catch (err) {
@@ -38,7 +36,7 @@ async function addToWatchlist(req, res) {
           media_type, season_number, total_seasons)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (user_id, tmdb_id, COALESCE(season_number, -1))
-       DO UPDATE SET queued_for = CURRENT_DATE, status = 'queued'
+       DO UPDATE SET status = 'queued'
        RETURNING *`,
       [
         req.user.id, tmdb_id, title, poster_path, release_year, runtime_min, genres,
