@@ -110,11 +110,20 @@ async function generateQuestionsWithGemini(movie) {
     },
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 20000); // 20s hard limit
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -147,17 +156,9 @@ async function generateQuiz(req, res) {
       return res.status(409).json({ error: 'already_verified' });
     }
 
-    let questions = [];
-    let source = 'gemini';
+    // Always use fallback questions (no AI call)
     const movie = await tmdb.get(`/movie/${tmdb_id}`, { append_to_response: 'credits' });
-
-    try {
-      questions = await generateQuestionsWithGemini(movie);
-    } catch (aiErr) {
-      questions = buildFallbackQuestions(movie, title);
-      source = 'fallback';
-      console.warn('Gemini quiz fallback used:', aiErr.message);
-    }
+    const questions = buildFallbackQuestions(movie, title);
 
     if (!questions.length) {
       return res.status(500).json({ error: 'Unable to generate quiz questions at this time.' });
@@ -171,7 +172,7 @@ async function generateQuiz(req, res) {
       [req.user.id, tmdb_id, JSON.stringify(questions)]
     );
 
-    res.json({ source, quiz_id: result.rows[0].id, questions: questions.map((q, i) => ({
+    res.json({ source: 'fallback', quiz_id: result.rows[0].id, questions: questions.map((q, i) => ({
       index: i,
       question: q.question,
       options: q.options,
