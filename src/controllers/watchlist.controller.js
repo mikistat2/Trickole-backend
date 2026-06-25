@@ -10,7 +10,7 @@ async function getWatchlist(req, res) {
          AND vw.user_id = w.user_id
          AND COALESCE(vw.season_number, -1) = COALESCE(w.season_number, -1)
        WHERE w.user_id = $1
-       ORDER BY w.added_at ASC`,
+       ORDER BY (vw.verified_at IS NOT NULL) ASC, w.added_at DESC`,
       [req.user.id]
     );
     res.json(result.rows);
